@@ -8,16 +8,22 @@ public class GPXMovementTracker : MonoBehaviour
     private double initialLatitude;
     private double initialLongitude;
     private float movementScale = 0.000009f; // Scale for Unity units to lat/lon, no duplicate
+    private List<(double latitude, double longitude, float elevation, string timestamp)> characterTrackPoints 
+        = new List<(double, double, float, string)>();
 
-    private List<(double latitude, double longitude, float elevation, string timestamp)> trackPoints = new List<(double, double, float, string)>();
-    private double currentLatitude;
-    private double currentLongitude;
+    private List<(double latitude, double longitude, float elevation, string timestamp)> realLifeTrackPoints 
+        = new List<(double, double, float, string)>();
+    private double characterLatitude;
+    private double characterLongitude;
+
+    private double realLifeLatitude;
+    private double realLifeLongitude;
     private Vector3 lastPosition; // testing duplicate
 
     private int stepCount = 0; // For real-life tracking, no duplicate
 
-    public double GetCurrentLatitude() => currentLatitude;
-    public double GetCurrentLongitude() => currentLongitude;
+    public double GetCurrentLatitude() => characterLatitude;
+    public double GetCurrentLongitude() => characterLongitude;
 
     void Start()
     {
@@ -46,16 +52,21 @@ public class GPXMovementTracker : MonoBehaviour
     public void ResetTracking()
     {
         Debug.Log("GPXMovementTracker: Resetting tracking data.");
-        trackPoints.Clear();
+        characterTrackPoints.Clear();
+        realLifeTrackPoints.Clear();
         stepCount = 0; // Reset step count for real-life tracking
 
         initialLatitude = GPXCoordinate.InitialLatitude;
         initialLongitude = GPXCoordinate.InitialLongitude;
-        currentLatitude = initialLatitude;
-        currentLongitude = initialLongitude;
+        characterLatitude = initialLatitude;
+        characterLongitude = initialLongitude;
+
+        realLifeLatitude = initialLatitude;
+        realLifeLongitude = initialLongitude;
 
         lastPosition = transform.position;
-        AddTrackPoint(); // Record starting position again
+        AddTrackPoint(characterTrackPoints, characterLatitude, characterLongitude);
+        AddTrackPoint(realLifeTrackPoints, realLifeLatitude, realLifeLongitude);
     }
 
     private void HandleStepReceived()
@@ -78,84 +89,70 @@ public class GPXMovementTracker : MonoBehaviour
 
     private void TrackCharacterMovement()
     {
-        // Calculate movement in Unity space
         Vector3 movement = transform.position - lastPosition;
 
-        // Update latitude and longitude based on movement
-        double deltaLatitude = movement.z * movementScale; // Z-axis affects latitude
-        double deltaLongitude = movement.x * (movementScale / Math.Cos(currentLatitude * (Math.PI / 180))); // X-axis affects longitude
+        double deltaLatitude = movement.z * movementScale;
+        double deltaLongitude = movement.x * (movementScale / Math.Cos(characterLatitude * (Math.PI / 180)));
 
-        currentLatitude += deltaLatitude;
-        currentLongitude += deltaLongitude;
+        characterLatitude += deltaLatitude;
+        characterLongitude += deltaLongitude;
 
-        // Update last position
         lastPosition = transform.position;
 
-        // Record the track point with the current timestamp
-        AddTrackPoint();
+        AddTrackPoint(characterTrackPoints, characterLatitude, characterLongitude);
     }
 
     private void TrackRealLifeMovement()
     {
-        stepCount++; // Increment step count
-
-        // Calculate distance for this step
-        float distance = GPXCoordinate.StepLength; // Distance in meters
-
-        // Convert distance to degrees (latitude)
+        float distance = GPXCoordinate.StepLength;
         float distanceInDegrees = distance / 111139f;
 
-        // Generate random direction (0 to 360 degrees)
         float randomAngle = UnityEngine.Random.Range(0f, 360f);
 
-        // Calculate latitude and longitude changes
         double deltaLatitude = distanceInDegrees * Math.Cos(randomAngle * (Math.PI / 180));
-        double deltaLongitude = distanceInDegrees * Math.Sin(randomAngle * (Math.PI / 180)) / Math.Cos(currentLatitude * (Math.PI / 180));
+        double deltaLongitude = distanceInDegrees * Math.Sin(randomAngle * (Math.PI / 180)) 
+                            / Math.Cos(realLifeLatitude * (Math.PI / 180));
 
-        // Update current position
-        currentLatitude += deltaLatitude;
-        currentLongitude += deltaLongitude;
+        realLifeLatitude += deltaLatitude;
+        realLifeLongitude += deltaLongitude;
 
-        // Record track point
-        AddTrackPoint();
+        AddTrackPoint(realLifeTrackPoints, realLifeLatitude, realLifeLongitude);
     }
 
-    private void AddTrackPoint()
+    private void AddTrackPoint(
+        List<(double latitude, double longitude, float elevation, string timestamp)> list,
+        double lat,
+        double lon)
     {
-        string timestamp = System.DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"); // ISO 8601 format
-        float elevation = 0.0f; // Set to 0 as there's no elevation change in this case
+        string timestamp = System.DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
+        float elevation = 0f;
 
-        trackPoints.Add((currentLatitude, currentLongitude, elevation, timestamp));
+        list.Add((lat, lon, elevation, timestamp));
     }
 
-    public string GenerateGPXData()
+    public string GenerateCharacterGPXData()
     {
-        // Try to get LevelManager for extra info
-        LevelManager levelManager = FindAnyObjectByType<LevelManager>();
-        int stepCount = 0;
-        float timeTaken = 0f;
-        int score = 0;
+        return GenerateGPX(characterTrackPoints, "Character Movement");
+    }
 
-        if (levelManager != null)
-        {
-            stepCount = levelManager.GetFinalStepCount();
-            timeTaken = levelManager.GetFinalTime();
-            score = levelManager.GetFinalScore();
-        }
+    public string GenerateRealLifeGPXData()
+    {
+        return GenerateGPX(realLifeTrackPoints, "Real-Life Movement");
+    }
 
+    private string GenerateGPX(
+        List<(double latitude, double longitude, float elevation, string timestamp)> points,
+        string trackName)
+    {
         StringBuilder gpxData = new StringBuilder();
+
         gpxData.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-        gpxData.AppendLine("<gpx version=\"1.1\" creator=\"GPXMovementTracker\" xmlns=\"http://www.topografix.com/GPX/1/1\" xmlns:fitmaze=\"fitmaze\">");
+        gpxData.AppendLine("<gpx version=\"1.1\" creator=\"GPXMovementTracker\" xmlns=\"http://www.topografix.com/GPX/1/1\">");
         gpxData.AppendLine("<trk>");
-        gpxData.AppendLine($"<name>{(GPXCoordinate.CurrentTrackingMode == GPXCoordinate.TrackingMode.CharacterTracking ? "Character Movement" : "Real-Life Movement")}</name>");
-        gpxData.AppendLine("<extensions>");
-        gpxData.AppendLine($"  <fitmaze:stepCount>{stepCount}</fitmaze:stepCount>");
-        gpxData.AppendLine($"  <fitmaze:timeTaken>{timeTaken:F2}</fitmaze:timeTaken>");
-        gpxData.AppendLine($"  <fitmaze:score>{score}</fitmaze:score>");
-        gpxData.AppendLine("</extensions>");
+        gpxData.AppendLine($"<name>{trackName}</name>");
         gpxData.AppendLine("<trkseg>");
 
-        foreach (var point in trackPoints)
+        foreach (var point in points)
         {
             gpxData.AppendLine($"<trkpt lat=\"{point.latitude}\" lon=\"{point.longitude}\">");
             gpxData.AppendLine($"  <ele>{point.elevation}</ele>");

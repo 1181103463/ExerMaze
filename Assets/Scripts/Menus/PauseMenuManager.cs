@@ -33,7 +33,7 @@ public class PauseMenuManager : BaseMenuManager
             return;
         }
 
-        MazeSaveData data = maze.GetMazeSaveData();
+        SaveMazeData data = maze.GetMazeSaveData();
 
         string json = JsonUtility.ToJson(data, true);
 

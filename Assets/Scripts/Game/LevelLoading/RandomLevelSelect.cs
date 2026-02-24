@@ -57,40 +57,16 @@ public class RandomLevelSelect : MonoBehaviour
 
         if (!File.Exists(path))
         {
-            Debug.LogWarning("No save file found.");
+            Debug.LogError("Save file not found!");
             return;
         }
 
         string json = File.ReadAllText(path);
-        MazeSaveData data = JsonUtility.FromJson<MazeSaveData>(json);
+        SaveMazeData data = JsonUtility.FromJson<SaveMazeData>(json);
 
-        ApplyLoadedData(data);
-    }
+        MazeSaveHolder.LoadedData = data;
+        MazeSaveHolder.HasLoadedData = true;
 
-    private void ApplyLoadedData(MazeSaveData data)
-    {
-        AutoMG3D_1010 maze = FindObjectOfType<AutoMG3D_1010>();
-
-        if (maze == null)
-        {
-            Debug.LogError("Maze not found in scene.");
-            return;
-        }
-
-        // Restore maze settings
-        maze.Width = data.width;
-        maze.Depth = data.depth;
-
-        Random.InitState(data.randomSeed);
-
-        // maze.GenerateMaze();
-
-        // Restore player position
-        GameObject player = GameObject.FindGameObjectWithTag("Player");
-        if (player != null)
-            player.transform.position = data.playerPosition;
-
-        Debug.Log("Game Loaded Successfully");
-        SelectLevel(maze.Width, maze.Depth);
+        SceneManager.LoadScene("RandomLevel");
     }
 }

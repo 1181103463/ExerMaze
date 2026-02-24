@@ -859,9 +859,9 @@ public class AutoMG3D_1010 : MonoBehaviour
     #endregion
 
     #region Save Maze Details
-    public MazeSaveData GetMazeSaveData()
+    public SaveMazeData GetMazeSaveData()
     {
-        MazeSaveData data = new MazeSaveData();
+        SaveMazeData data = new SaveMazeData();
 
         data.width = width;
         data.depth = depth;
@@ -871,7 +871,7 @@ public class AutoMG3D_1010 : MonoBehaviour
 
         data.playerPosition = player != null ? player.position : Vector3.zero;
 
-        data.randomSeed = Random.Range(0, 999999); // Better: store your actual seed if using one
+        data.seed = seed;
 
         return data;
     }

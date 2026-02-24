@@ -39,7 +39,8 @@ public class GPXFileSaver : MonoBehaviour
                 return;
             }
         }
-        string gpxData = tracker.GenerateGPXData();
+        string characterGpx = tracker.GenerateCharacterGPXData();
+        string realLifeGpx = tracker.GenerateRealLifeGPXData();
 
         UnityEngine.WSA.Application.InvokeOnUIThread(async () =>
         {
@@ -58,17 +59,29 @@ public class GPXFileSaver : MonoBehaviour
 
                 if (file != null)
                 {
-                    Debug.Log($"File selected: {file.Path}");
+                    Debug.LogError($"Base file selected: {file.Path}");
 
-                    // Write the GPX data to the selected file
-                    Debug.Log("GPX data generated.");
+                    string folderPath = System.IO.Path.GetDirectoryName(file.Path);
+                    string baseName = System.IO.Path.GetFileNameWithoutExtension(file.Name);
 
-                    await FileIO.WriteTextAsync(file, gpxData);
-                    Debug.Log("GPX file successfully saved.");
+                    StorageFolder folder = await StorageFolder.GetFolderFromPathAsync(folderPath);
+
+                    StorageFile characterFile = await folder.CreateFileAsync(
+                        baseName + "_character.gpx",
+                        CreationCollisionOption.ReplaceExisting);
+
+                    StorageFile realLifeFile = await folder.CreateFileAsync(
+                        baseName + "_reallife.gpx",
+                        CreationCollisionOption.ReplaceExisting);
+
+                    await FileIO.WriteTextAsync(characterFile, characterGpx);
+                    await FileIO.WriteTextAsync(realLifeFile, realLifeGpx);
+
+                    Debug.LogError("Both GPX files saved successfully.");
                 }
                 else
                 {
-                    Debug.Log("Save operation was canceled by the user.");
+                    Debug.LogError("Save operation was canceled by the user.");
                 }
             }
             catch (Exception ex)
